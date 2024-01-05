@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Circuit Simulator</title>
+<style>
+</style>
+<script>
+
+// DOM manip cheatsheet
+// ; document.createElement(nodeName)
+// ; document.body.appendChild(node)
+// ; document.createTextNode("text")
+// ; node.className = 'whatever';
+// ; node.setAttribute('draggable', 'true')
+// ; node.onsomekindofeventhandler =
+//     (ev) =>
+//       { // so what can ev do?
+//       }
+
+// Verified logical operator symbols:
+// ¬ NOT (also more ambiguously !, ~)
+// ⊽ NOR
+// ⊼ NAND
+// ⊻ XOR (also more ambiguously ^, ⊕, ⨁, ⊕, ⨁)
+// ∨ OR (also more ambiguously ⋁, |, ||)
+// ∧ AND (also more ambiguously ⋀, &, &&)
+
+; // null means mouse recognized as being held down
+; // this can also mean "drag interrupted so we're rejecting mouse until it's down again"
+; window.mouseDownOver = null
+; window.mouseExpiryTimer = null
+; window.MASK_INPUT_FROM_ABOVE = 0x1 // Never
+; window.MASK_INPUT_FROM_RIGHT = 0x2 // Eat
+; window.MASK_INPUT_FROM_BELOW = 0x4 // Shredded
+; window.MASK_INPUT_FROM_LEFT  = 0x8 // Wheat
+; window.maskOppositeDirections = {}
+; maskOppositeDirections[MASK_INPUT_FROM_ABOVE] = MASK_INPUT_FROM_BELOW
+; maskOppositeDirections[MASK_INPUT_FROM_RIGHT] = MASK_INPUT_FROM_LEFT
+; maskOppositeDirections[MASK_INPUT_FROM_LEFT ] = MASK_INPUT_FROM_RIGHT
+; maskOppositeDirections[MASK_INPUT_FROM_BELOW] = MASK_INPUT_FROM_ABOVE
+
+; window.nodeTypeLegend =
+  { OR:
+    { symbol: '∨'
+    , description: 'sum of inputs > 0'
+    , inputsAllowed: true
+    }
+  , NOR:
+    { symbol: '⊽'
+    , description: 'sum of inputs < 1'
+    , inputsAllowed: true
+    }
+  , NAND:
+    { symbol: '⊼'
+    , description: 'sum of inputs < 2'
+    , inputsAllowed: true
+    }
+  , XOR:
+    { symbol: '⊻'
+    , description: 'sum of inputs == 1'
+    , inputsAllowed: true
+    }
+  , AND:
+    { symbol: '∧'
+    , description: 'sum of inputs > 1'
+    , inputsAllowed: true
+    }
+  , STAR:
+    { symbol: '⭐'
+    , description: 'Cannot have inputs: Always hot'
+    , inputsAllowed: false
+    }
+  , PUSH:
+    { symbol: '👇'
+    , description: 'Cannot have inputs: Hot while being pressed'
+    , inputsAllowed: false
+    }
+  , TOGGLE:
+    { symbol: '✔❌'
+    , description: 'Cannot have inputs: Pressing toggles between hot/cold'
+    , inputsAllowed: false
+    }
+  }
+; window.nodeTypes = Object.keys(nodeTypeLegend)
+
+; window.board =
+  { width: 10
+  , height: 10
+  , name: "main"
+  , cellSize: "50px"
+  , cells:[]
+  , DOMnode:null // will get filled in later
+  }
+
+; window.signalMap = new Set(['main:5', 'main:6', 'main:44'])
+
+; function initialize()
+  { let h1 =
+      { nodeName:"h1"
+      , nodeChildren:["Circuit Simulator"]
+      }
+  ; document.body.appendChild(createDomNode(h1))
+
+  ; let table =
+      { nodeName:"table"
+      , nodeAttributes:
+        { cellspacing:"0"
+        , style:
+          { 'user-select': 'none'
+          }
+        }
+      , nodeChildren:[]
+      }
+  ; for(let y=0; y<board.height; y++)
+    { let tableRow =
+        { nodeName:"tr"
+        , nodeChildren:[]
+        }
+    ; for(let x=0; x<board.width; x++)
+      { let tableCellID = ("main:"+ (x+y*board.width))
+      ; let tableCell =
+          { nodeName:"th"
+          , nodeAttributes:
+            { style:
+              { width:board.cellSize
+              , height:board.cellSize
+              , "background-image":"url(images/spritesheet.png)"
+              , "background-size": "1600% 100%"
+              , "background-repeat": "no-repeat"
+              , "background-position-x": "0px"
+              , "background-position-y": "top"
+              , "color": "black !important"
+              // , filter: "invert(100%)"
+              }
+            , onmousedown:"tableCellMouseEvent('DOWN', '"+ tableCellID +"')"
+            , onmousemove:"tableCellMouseEvent('MOVE', '"+ tableCellID +"')"
+            , onmouseenter:"tableCellMouseEvent('ENTER', '"+ tableCellID +"')"
+            , onmouseleave:"tableCellMouseEvent('LEAVE', '"+ tableCellID +"')"
+            , onmouseup:"tableCellMouseEvent('UP', '"+ tableCellID +"')"
+            , ondragover:"event.preventDefault()"
+            , ondrop:"boardCellDragRelease(event)"
+            , id:tableCellID
+            }
+          , nodeChildren: ['']
+          }
+        tableRow.nodeChildren.push(tableCell)
+      }
+      if(y<nodeTypes.length)
+      { let nodeType = nodeTypes[y]
+      ; tableRow.nodeChildren.push
+        ( { nodeName: 'th'
+          , nodeAttributes:
+            { style:
+              { width:board.cellSize
+              , height:board.cellSize
+              }
+            , id: 'legend-symbol-'+ nodeType
+            , draggable: 'true'
+            , ondragstart: 'nodeTypeDragStart(event)'
+            }
+          , nodeChildren: nodeTypeLegend[nodeType].symbol
+          }
+        , { nodeName: 'th'
+          , nodeAttributes:
+            { id: 'legend-name-'+ nodeType
+            , draggable: 'true'
+            , ondragstart: 'nodeTypeDragStart(event)'
+            }
+          , nodeChildren: nodeType
+          }
+        , { nodeName: 'td'
+          , nodeAttributes:
+            { style:
+              { padding:'0 10px'
+              }
+            , id: 'legend-description-'+ nodeType
+            , draggable: 'true'
+            , ondragstart: 'nodeTypeDragStart(event)'
+            }
+          , nodeChildren: nodeTypeLegend[nodeType].description
+          }
+        )
+      }
+      table.nodeChildren.push(tableRow)
+    }
+  ; board.DOMnode = table
+  ; document.body.appendChild(createDomNode(table))
+  ; for(let cellIndex=0; cellIndex<board.width*board.height; cellIndex++)
+    { board.cells[cellIndex] ??=
+      { 'nodeType':'OR'
+      // { 'nodeType':nodeTypes[IntMod(cellIndex, nodeTypes.length)]
+      , 'inputMask':0
+      , 'neighborInputAddressSet':new Set()
+      }
+
+    ; RenderBoardCell(board, signalMap, cellIndex)
+    }
+  }
+
+; function nodeTypeDragStart(event)
+  { let nodeType = event.target.id.split('-', 3)[2]
+  ; event.dataTransfer.setData("text/plain", 'nodeType:'+ nodeType)
+  }
+
+; function boardCellDragRelease(event)
+  { event.preventDefault()
+  ; let cellIndex = event.target.id.split(':')[1]
+  ; let droppedContents = event.dataTransfer.getData('text/plain').split(':', 2)
+  ; switch(droppedContents[0])
+    { case 'nodeType':
+      ; let nodeType = droppedContents[1]
+      ; board.cells[cellIndex].nodeType = nodeType
+      ; break
+
+      default:
+      ; console.log
+        ( ( "Board cell #"
+          + cellIndex
+          + " received an unrecognized drag/drop payload"
+          )
+        , droppedContents
+        )
+      ; break
+    }
+  ; RenderBoardCell(board, signalMap, cellIndex)
+  }
+
+// Accepts a node recipe of one of the following two forms:
+// * A naked string
+// * { nodeName, nodeAttributes, nodeChildren }
+// where each node child is either another node.
+// naked Strings render to text nodes.
+; function createDomNode(nodeRecipe)
+  { let node
+  ; if(typeof(nodeRecipe)=="object")
+    { if(nodeRecipe.hasOwnProperty("nodeName"))
+      { nodeRecipe.nodeAttributes ??= {}
+      ; nodeRecipe.nodeChildren ??= []
+      ; node = document.createElement(nodeRecipe.nodeName)
+      ; for(let nodeAttribute in nodeRecipe.nodeAttributes)
+        { let nodeAttributeContent = nodeRecipe.nodeAttributes[nodeAttribute]
+        ; if(nodeAttribute=="style" && typeof(nodeAttributeContent)=="object")
+          { let styleString = ""
+            for(let styleKey in nodeAttributeContent)
+            { styleString +=
+                ( styleKey
+                + ": "
+                + nodeAttributeContent[styleKey]
+                + "; "
+                )
+            }
+            node.setAttribute("style", styleString)
+          }
+          else
+          { node.setAttribute(nodeAttribute, nodeAttributeContent)
+          }
+        }
+      ; for(let nodeChild in nodeRecipe.nodeChildren)
+        { node.appendChild(createDomNode(nodeRecipe.nodeChildren[nodeChild]))
+        }
+      }
+      else
+      { condole.log
+        ( "Error: createDomNode() called with invalid nodeRecipe:"
+        , nodeRecipe
+        )
+      }
+    }
+    else // assume string
+    { node = document.createTextNode(nodeRecipe)
+    }
+  ; return(node)
+  }
+
+; function tableCellMouseEvent(changeType, tableCellID)
+  { let currentTableCellIndex = AddressToIndex(tableCellID)
+  ; let oldTableCellIndex = AddressToIndex(mouseDownOver)
+  ; clearTimeout(mouseExpiryTimer)
+  ; mouseExpiryTimer=null
+
+  ; switch(changeType)
+    { case 'UP':
+      ; mouseDownOver=null
+      ; break
+
+      case 'DOWN':
+      ; mouseDownOver=tableCellID
+      ; break
+
+      case 'MOVE':
+      case 'ENTER':
+      ; if
+        ( mouseDownOver==null
+        ||mouseDownOver==tableCellID
+        ) { break; } // only track dragging movement between distinct cells
+
+      ; let SetInputFromNeighbor = (bitmask) =>
+        { let nodeType = board.cells[currentTableCellIndex].nodeType
+        ; if(nodeTypeLegend[nodeType].inputsAllowed)
+          { board.cells[currentTableCellIndex].neighborInputAddressSet.add(mouseDownOver)
+          ; board.cells[currentTableCellIndex].inputMask |= bitmask
+          ; board.cells[oldTableCellIndex].neighborInputAddressSet.delete(tableCellID)
+          ; board.cells[oldTableCellIndex].inputMask &= ~maskOppositeDirections[bitmask]
+          ; RenderBoardCell(board, signalMap, oldTableCellIndex)
+          ; RenderBoardCell(board, signalMap, currentTableCellIndex)
+          }
+        ; mouseDownOver=tableCellID
+        }
+      ; if(oldTableCellIndex + board.width == currentTableCellIndex)
+        { SetInputFromNeighbor(MASK_INPUT_FROM_ABOVE)
+        }
+        else if
+          ( oldTableCellIndex - 1 == currentTableCellIndex
+          // current cell not already on right edge
+          &&currentTableCellIndex%board.width<board.width-1
+          )
+        { SetInputFromNeighbor(MASK_INPUT_FROM_RIGHT)
+        }
+        else if(oldTableCellIndex - board.width == currentTableCellIndex)
+        { SetInputFromNeighbor(MASK_INPUT_FROM_BELOW)
+        }
+        else if
+          ( oldTableCellIndex + 1 == currentTableCellIndex
+          // current cell not already on left edge
+          &&currentTableCellIndex%board.width>0
+          )
+        { SetInputFromNeighbor(MASK_INPUT_FROM_LEFT)
+        }
+        else
+        { mouseDownOver=null // moved to non-neighbor: drag break
+        ; break
+        }
+      ; break
+
+      // This is to protect against mouse focus changes
+      case 'LEAVE':
+      ; mouseExpiryTimer =
+          setTimeout
+          ( () => { tableCellMouseEvent('UP', tableCellID) }
+          , 500
+          )
+      ; break
+
+      default:
+      ; console.log("Unrecognized changeType in tableCellMouseEvent():", changeType)
+      ; break
+    }
+  }
+
+; function RenderBoardCell(board, signalMap, cellIndex)
+  { let cellAddress = board.name +':'+ cellIndex
+  ; let node = document.getElementById(cellAddress)
+  ; let cell = board.cells[cellIndex]
+  ; let hot = signalMap.has(board.name +':'+ cellIndex)
+  ; let symbol =
+      ( cell.nodeType == 'OR'
+      ? ''
+      : ( hot
+        ? Array.from(nodeTypeLegend[cell.nodeType].symbol)[0] //first codepoint
+        : Array.from(nodeTypeLegend[cell.nodeType].symbol).slice(-1)[0] //last codepoint
+        )
+      )
+
+  ; if(!nodeTypeLegend[cell.nodeType].inputsAllowed)
+    { board.cells[cellIndex].inputMask = 0
+    }
+
+  ; let backgroundStyles =
+    { backgroundImage:[]
+    , backgroundPositionX:[]
+    , backgroundPositionY:[]
+    , backgroundSize:[]
+    }
+  ; if(hot)
+    { backgroundStyles.backgroundImage.push('url(images/hot%20glow.png)')
+    ; backgroundStyles.backgroundPositionX.push('49.0566%')
+    ; backgroundStyles.backgroundPositionY.push('49.0566%')
+    ; backgroundStyles.backgroundSize.push('47% 47%')
+    }
+  ; backgroundStyles.backgroundImage.push('url(images/spritesheet.png)')
+  ; backgroundStyles.backgroundSize.push('1600% 100%')
+  ; backgroundStyles.backgroundPositionX.push
+    ( '+'
+    + (board.cells[cellIndex].inputMask*(100/15))
+    + '%'
+    )
+  ; backgroundStyles.backgroundPositionY.push('0')
+    for(let backgroundStyleName in backgroundStyles)
+    { node.style[backgroundStyleName] =
+        backgroundStyles[backgroundStyleName].join(', ')
+    }
+  ; node.firstChild.data = symbol
+  }
+
+; function AddressToIndex(address)
+  { if(typeof(address)!="string") { return -1; }
+  ; let addressParts = address.split(':',2)
+
+  ; // only handle "main" board for the time being
+  ; if(addressParts[0]!='main') { return -1; }
+
+  ; // invalid unless second part is a plainclothes non-negative integer
+  ; if(!/^\d+$/.test(addressParts[1])) { return -1; }
+
+  ; return(+addressParts[1])
+  }
+
+; function Round(value) { return(Math.floor(value+0.5)) }
+; function RealMod(value, base) { return(((value/base) - Math.floor(value/base))*base) }
+; function IntMod(value, base) { return(Round(RealMod(value,base))) }
+
+</script>
+</head>
+<body onload="initialize()"></body>
+</html>
