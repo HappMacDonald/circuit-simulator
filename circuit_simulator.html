@@ -3,8 +3,55 @@
 <head>
 <title>Circuit Simulator</title>
 <style>
+html
+{ display: grid
+; place-items: center
+}
+body
+{ display: grid;
+  /*; background: white; */
+; grid-template-areas:  "header mediaControls"
+                        "boardDesigner legend"
+/* ; grid-template-rows:    100px 1fr
+; grid-template-columns: 1fr 1fr */
+; place-items: center
+; grid-gap: 5px
+; padding: 0
+; margin: 0
+; box-sizing: border-box
+}
+.header
+{ grid-area: header
+}
+.mediaControls
+{ grid-area: mediaControls
+}
+.boardDesigner
+{ grid-area: boardDesigner
+}
+.legend
+{ grid-area: legend
+}
+.cellSquare
+{ width: 50px
+; height: 50px
+; text-align: center
+}
+
 </style>
 <script>
+
+// == 2024-01-05 Todo status:
+// X Single grid board "main" hardcoded to exist at 10x10
+// X Legend of node types can be drug onto board
+// X Can drag across grid cells to define input chains
+// X signalMap is frozen with a handful of hot cells for testing
+// X play/pause to enable signal flow
+//   Port signal flow logic from Perl proof of concept to HTML/JS
+//   Support push and toggle buttons during play
+//   Introduce A,B,C,D programmable input nodeTypes
+//   Work out system for multiple board grids, chip burning, etc
+//   Possibly work out system for beyond-grid circuit design, especially for burnt chips.
 
 // DOM manip cheatsheet
 // ; document.createElement(nodeName)
@@ -17,17 +64,10 @@
 //       { // so what can ev do?
 //       }
 
-// Verified logical operator symbols:
-// ¬ NOT (also more ambiguously !, ~)
-// ⊽ NOR
-// ⊼ NAND
-// ⊻ XOR (also more ambiguously ^, ⊕, ⨁, ⊕, ⨁)
-// ∨ OR (also more ambiguously ⋁, |, ||)
-// ∧ AND (also more ambiguously ⋀, &, &&)
-
 ; // null means mouse recognized as being held down
 ; // this can also mean "drag interrupted so we're rejecting mouse until it's down again"
 ; window.mouseDownOver = null
+
 ; window.mouseExpiryTimer = null
 ; window.MASK_INPUT_FROM_ABOVE = 0x1 // Never
 ; window.MASK_INPUT_FROM_RIGHT = 0x2 // Eat
@@ -67,36 +107,72 @@
     }
   , STAR:
     { symbol: '⭐'
-    , description: 'Cannot have inputs: Always hot'
+    , description: 'Always hot'
     , inputsAllowed: false
     }
   , PUSH:
     { symbol: '👇'
-    , description: 'Cannot have inputs: Hot while being pressed'
+    , description: 'Hot while being pressed'
     , inputsAllowed: false
     }
   , TOGGLE:
     { symbol: '✔❌'
-    , description: 'Cannot have inputs: Pressing toggles between hot/cold'
+    , description: 'Pressing toggles between hot/cold'
+    , inputsAllowed: false
+    }
+  , A:
+    { symbol: 'A'
+    , inputsAllowed: false
+    }
+  , B:
+    { symbol: 'B'
+    , inputsAllowed: false
+    }
+  , C:
+    { symbol: 'C'
+    , inputsAllowed: false
+    }
+  , D:
+    { symbol: 'D'
     , inputsAllowed: false
     }
   }
 ; window.nodeTypes = Object.keys(nodeTypeLegend)
+; window.nodeTypesSignalInputs = ['A', 'B', 'C', 'D']
+; window.USER_INTERFACE_MODE_EDIT = 0
+; window.USER_INTERFACE_MODE_SIMULATE = 1
+; window.userInterfaceMode = USER_INTERFACE_MODE_EDIT
+; window.mediaControlPlayPauseSymbols =
+  [ '▶' // index 0=USER_INTERFACE_MODE_EDIT, button "play" changes to simulate
+  , '⏸' // index 0=USER_INTERFACE_MODE_SIMULATE, button "pause" changes to edit
+  ]
+
+; window.SIMULATION_HAS_NOT_YET_HAPPENED = -1
+; window.steps = SIMULATION_HAS_NOT_YET_HAPPENED
+; window.stepDelayInMilliseconds = 500
+; window.stepTimerHandle = null
+; window.SAFE_TO_SKIP_HASH_CHECK = -1
+; window.lastSimulatedBoardHash = SAFE_TO_SKIP_HASH_CHECK
 
 ; window.board =
   { width: 10
   , height: 10
   , name: "main"
-  , cellSize: "50px"
   , cells:[]
   , DOMnode:null // will get filled in later
   }
 
-; window.signalMap = new Set(['main:5', 'main:6', 'main:44'])
+; window.EMPTY_SIGNAL_MAP = new Set(['main:5', 'main:6', 'main:44'])
+; window.signalMap = EMPTY_SIGNAL_MAP
+
+; function Round(value) { return(Math.floor(value+0.5)) }
+; function RealMod(value, base) { return(((value/base) - Math.floor(value/base))*base) }
+; function IntMod(value, base) { return(Round(RealMod(value,base))) }
 
 ; function initialize()
   { let h1 =
       { nodeName:"h1"
+      , nodeAttributes: { class:'header' }
       , nodeChildren:["Circuit Simulator"]
       }
   ; document.body.appendChild(createDomNode(h1))
@@ -105,6 +181,7 @@
       { nodeName:"table"
       , nodeAttributes:
         { cellspacing:"0"
+        , class:'boardDesigner'
         , style:
           { 'user-select': 'none'
           }
@@ -122,9 +199,7 @@
           { nodeName:"th"
           , nodeAttributes:
             { style:
-              { width:board.cellSize
-              , height:board.cellSize
-              , "background-image":"url(images/spritesheet.png)"
+              { "background-image":"url(images/spritesheet.png)"
               , "background-size": "1600% 100%"
               , "background-repeat": "no-repeat"
               , "background-position-x": "0px"
@@ -140,27 +215,163 @@
             , ondragover:"event.preventDefault()"
             , ondrop:"boardCellDragRelease(event)"
             , id:tableCellID
+            , class:'cellSquare'
             }
           , nodeChildren: ['']
           }
-        tableRow.nodeChildren.push(tableCell)
+      ; tableRow.nodeChildren.push(tableCell)
       }
-      if(y<nodeTypes.length)
-      { let nodeType = nodeTypes[y]
-      ; tableRow.nodeChildren.push
-        ( { nodeName: 'th'
+    ; table.nodeChildren.push(tableRow)
+    }
+  ; board.DOMnode = table
+  ; document.body.appendChild(createDomNode(table))
+  ; for(let cellIndex=0; cellIndex<board.width*board.height; cellIndex++)
+    { board.cells[cellIndex] ??=
+      { 'nodeType':'OR'
+      // { 'nodeType':nodeTypes[IntMod(cellIndex, nodeTypes.length)]
+      , 'inputMask':0
+      , 'neighborInputAddressSet':new Set()
+      }
+
+    ; RenderBoardCell(board, signalMap, cellIndex)
+    }
+  ; table =
+    { nodeName:"table"
+    , nodeAttributes:
+      { cellspacing:"0"
+      , class:'mediaControls'
+      , style:
+        { 'user-select': 'none'
+        }
+      }
+    , nodeChildren:
+      [ { nodeName: 'tr'
+        , nodeChildren:
+          [ { nodeName: 'th'
+            , nodeAttributes:
+              { class:'cellSquare'
+              }
+            , nodeChildren:
+              [ { nodeName: 'button'
+                , nodeAttributes: { id:'mediaControlRestart' }
+                , nodeChildren: '⇤'
+                }
+              ]
+            }
+          , { nodeName: 'th'
+            , nodeAttributes:
+              { class:'cellSquare'
+              }
+            , nodeChildren:
+              [ { nodeName: 'button'
+                , nodeAttributes: { id:'mediaControlStepBack' }
+                , nodeChildren: '←'
+                }
+              ]
+            }
+          , { nodeName: 'th'
+            , nodeAttributes:
+              { class:'cellSquare'
+              }
+            , nodeChildren:
+              [ { nodeName: 'button'
+                , nodeAttributes:
+                  { id:'mediaControlPlayPause'
+                  , onclick:'MediaPlayPause()'
+                  }
+                , nodeChildren: '▶'
+                }
+              ]
+            }
+          , { nodeName: 'th'
+            , nodeAttributes:
+              { class:'cellSquare'
+              }
+            , nodeChildren:
+              [ { nodeName: 'button'
+                , nodeAttributes: { id:'mediaControlStepForward' }
+                , nodeChildren: '→'
+                }
+              ]
+            }
+          , { nodeName: 'td'
+            , nodeAttributes: {id:'stepsDisplayTD'}
+            , nodeChildren:
+              [ 'Steps: '
+              , SIMULATION_HAS_NOT_YET_HAPPENED
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ; document.body.appendChild(createDomNode(table))
+  ; table =
+    { nodeName:"table"
+    , nodeAttributes:
+      { cellspacing:"0"
+      , class:'legend'
+      , style:
+        { 'user-select': 'none'
+        }
+      }
+    , nodeChildren:[]
+    }
+  ; for(let nodeType in nodeTypeLegend)
+    { let tableRow =
+        { nodeName:"tr"
+        , nodeChildren:[]
+        }
+    ; tableRow.nodeChildren.push
+      ( { nodeName: 'th'
+        , nodeAttributes:
+          { id: 'legend-symbol-'+ nodeType
+          , draggable: 'true'
+          , ondragstart: 'nodeTypeDragStart(event)'
+          , class:'cellSquare'
+          }
+        , nodeChildren:
+          [ { nodeName: 'label'
+            , nodeAttributes:
+              { for: 'legend-signalTextInput-'+ nodeType
+              }
+            , nodeChildren: nodeTypeLegend[nodeType].symbol
+            }
+          ]
+        }
+      )
+    ; if(nodeTypesSignalInputs.includes(nodeType))
+      { tableRow.nodeChildren.push
+        ( { nodeName: 'td'
           , nodeAttributes:
             { style:
-              { width:board.cellSize
-              , height:board.cellSize
+              { padding:'0 10px'
+              // , border:'1px solid red'
               }
-            , id: 'legend-symbol-'+ nodeType
+            , id: 'legend-signalText-'+ nodeType
             , draggable: 'true'
             , ondragstart: 'nodeTypeDragStart(event)'
+            , colspan: 2
             }
-          , nodeChildren: nodeTypeLegend[nodeType].symbol
+          , nodeChildren:
+            [ { nodeName: 'input'
+              , nodeAttributes:
+                { type:'text'
+                , style: { width:'100%' }
+                , id: 'legend-signalTextInput-'+ nodeType
+                , name: 'legend-signalTextInput-'+ nodeType
+                , oninput:"this.value = this.value.replace(/[^01]/, '')"
+                , spellcheck:'false'
+                , placeholder:"Repeating binary signal train, ie '000111000111'"
+                }
+              }
+            ]
           }
-        , { nodeName: 'th'
+        )
+      }
+      else
+      { tableRow.nodeChildren.push
+        ( { nodeName: 'th'
           , nodeAttributes:
             { id: 'legend-name-'+ nodeType
             , draggable: 'true'
@@ -181,20 +392,9 @@
           }
         )
       }
-      table.nodeChildren.push(tableRow)
+    ; table.nodeChildren.push(tableRow)
     }
-  ; board.DOMnode = table
   ; document.body.appendChild(createDomNode(table))
-  ; for(let cellIndex=0; cellIndex<board.width*board.height; cellIndex++)
-    { board.cells[cellIndex] ??=
-      { 'nodeType':'OR'
-      // { 'nodeType':nodeTypes[IntMod(cellIndex, nodeTypes.length)]
-      , 'inputMask':0
-      , 'neighborInputAddressSet':new Set()
-      }
-
-    ; RenderBoardCell(board, signalMap, cellIndex)
-    }
   }
 
 ; function nodeTypeDragStart(event)
@@ -347,6 +547,13 @@
     }
   }
 
+; function RenderBoard(board, signalMap)
+  { const oneDSize = board.width*board.height
+  ; for(let cellIndex=0; cellIndex<oneDSize; cellIndex++)
+    { RenderBoardCell(board, signalMap, cellIndex)
+    }
+  }
+
 ; function RenderBoardCell(board, signalMap, cellIndex)
   { let cellAddress = board.name +':'+ cellIndex
   ; let node = document.getElementById(cellAddress)
@@ -405,9 +612,79 @@
   ; return(+addressParts[1])
   }
 
-; function Round(value) { return(Math.floor(value+0.5)) }
-; function RealMod(value, base) { return(((value/base) - Math.floor(value/base))*base) }
-; function IntMod(value, base) { return(Round(RealMod(value,base))) }
+function MediaPlayPause()
+{ clearInterval(stepTimerHandle)
+; userInterfaceMode = 1-userInterfaceMode // toggles between 0=edit and 1=simulate
+; document.getElementById('mediaControlPlayPause').firstChild.data =
+    mediaControlPlayPauseSymbols[userInterfaceMode]
+
+  if(userInterfaceMode==USER_INTERFACE_MODE_SIMULATE)
+  { // run first step immediately, and let that function handle scheduling
+    // later steps
+  ; SimulateStep()
+  }
+  else
+  { if(steps!=SIMULATION_HAS_NOT_YET_HAPPENED)
+    { lastSimulatedBoardHash = cyrb53(JSON.stringify(board))
+    }
+  }
+}
+
+function SimulateStep()
+{ if(userInterfaceMode!=USER_INTERFACE_MODE_SIMULATE)
+  { clearInterval(stepTimerHandle)
+  }
+
+; if(steps == SIMULATION_HAS_NOT_YET_HAPPENED)
+  { signalMap = EMPTY_SIGNAL_MAP
+  ; lastSimulatedBoardHash = SAFE_TO_SKIP_HASH_CHECK
+  }
+
+; if
+  ( lastSimulatedBoardHash == SAFE_TO_SKIP_HASH_CHECK
+  ||lastSimulatedBoardHash == cyrb53(JSON.stringify(board)) // no edits since last sim step
+  )
+  { steps++
+  }
+; UpdateStepsDisplay()
+; lastSimulatedBoardHash = SAFE_TO_SKIP_HASH_CHECK
+
+// TBI: Actually perform a simulation step
+; RenderBoard(board, signalMap)
+
+  // This `if` clause helps ensure that manual press of step forward in edit mode
+  // does not wind up repeating
+; if(userInterfaceMode==USER_INTERFACE_MODE_SIMULATE)
+  { clearInterval(stepTimerHandle)
+  ; stepTimerHandle = setInterval(SimulateStep, stepDelayInMilliseconds)
+  }
+}
+
+function CalculateSignalMap(network, oldSignalMap, step)
+{ let newSignalMap = new Set()
+; return(newSignalMap)
+}
+
+function UpdateStepsDisplay()
+{ document.getElementById('stepsDisplayTD').childNodes[1].data = steps
+}
+
+// simple and fast 53-bit string hashing function released CC0 here:
+// https://github.com/bryc/code/blob/master/jshash/experimental/cyrb53.js
+function cyrb53(stringToHash, seed=0)
+{ let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed
+; for(let i = 0, ch; i < stringToHash.length; i++)
+  { ch = stringToHash.charCodeAt(i)
+  ; h1 = Math.imul(h1 ^ ch, 2654435761)
+  ; h2 = Math.imul(h2 ^ ch, 1597334677)
+  }
+; h1  = Math.imul(h1 ^ (h1 >>> 16), 2246822507)
+; h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+; h2  = Math.imul(h2 ^ (h2 >>> 16), 2246822507)
+; h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+
+; return 4294967296 * (2097151 & h2) + (h1 >>> 0)
+}
 
 </script>
 </head>

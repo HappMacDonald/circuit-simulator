@@ -52,7 +52,6 @@
 # ; my $frameDelayInSeconds = 0.5
 # ; my $frameDelayInSeconds = 0.66
 # ; my $frameDelayInSeconds = 1
-; my $defaultRefractoryPeriod = 2
 ; my $step = 0
 ; my $arbitrarilyLargeValue = 9**9**9 # Either "infinity" or close enough for our purposes
 ; my $Board2D =
