@@ -1,0 +1,83 @@
+= NETWORK
+'board.0:6':  { inputAddressSet: [ 'board.0:5' ],    nodeType: 'OR' /*chip*/ }
+'board.0:7':  { inputAddressSet: [ 'widget.0:19' ],  nodeType: 'OR' /*chip*/ }
+'board.0:8':  { inputAddressSet: [ 'board.0:7' ],    nodeType: 'OR' }
+'board.0:16': { inputAddressSet: [ 'board.0:15' ],   nodeType: 'OR' /*chip*/ }
+'board.0:21': { inputAddressSet: [ 'board.0:20' ],   nodeType: 'OR' /*chip*/ }
+'board.0:22': { inputAddressSet: [ 'widget.1:19' ],  nodeType: 'OR' /*chip*/ }
+'board.0:23': { inputAddressSet: [ 'board.0:22' ],   nodeType: 'OR' }
+'board.0:26': { inputAddressSet: [ 'board.0:15' ],   nodeType: 'OR' /*chip*/ }
+'board.0:27': { inputAddressSet: [ 'widget.0:49' ],  nodeType: 'OR' /*chip*/ }
+'board.0:28': { inputAddressSet: [ 'board.0:27' ],   nodeType: 'OR' }
+'board.0:31': { inputAddressSet: [ 'board.0:30' ],   nodeType: 'OR' /*chip*/ }
+'board.0:41': { inputAddressSet: [ 'board.0:40' ],   nodeType: 'OR' /*chip*/ }
+'board.0:42': { inputAddressSet: [ 'widget.1:49' ],  nodeType: 'OR' /*chip*/ }
+'board.0:43': { inputAddressSet: [ 'board.0:42' ],   nodeType: 'OR' }
+'board.0:46': { inputAddressSet: [ 'board.0:45' ],   nodeType: 'OR' /*chip*/ }
+'board.0:56': { inputAddressSet: [ 'board.0:55' ],   nodeType: 'OR' /*chip*/ }
+'board.0:57': { inputAddressSet: [ 'NAND.0:9' ],     nodeType: 'OR' /*chip*/ }
+'board.0:58': { inputAddressSet: [ 'board.0:57' ],   nodeType: 'OR' }
+
+'widget.0:10': { inputAddressSet: [ 'board.0:6' ],   nodeType: 'OR' /*InputIO*/ }
+'widget.0:11': { inputAddressSet: [ 'widget.0:10' ], nodeType: 'OR' }
+'widget.0:15': { inputAddressSet: [ 'widget.0:14' ], nodeType: 'OR' /*chip*/ }
+'widget.0:19': { inputAddressSet: [ 'widget.0:18' ], nodeType: 'OR' /*OutputIO*/ }
+'widget.0:25': { inputAddressSet: [ 'widget.0:24' ], nodeType: 'OR' /*chip*/ }
+'widget.0:26': { inputAddressSet: [ 'NAND.1:9' ],    nodeType: 'OR' /*chip*/ }
+'widget.0:27': { inputAddressSet: [ 'widget.0:26' ], nodeType: 'OR' }
+'widget.0:30': { inputAddressSet: [ 'board.0:16' ],  nodeType: 'OR' /*InputIO*/ }
+'widget.0:31': { inputAddressSet: [ 'widget.0:30' ], nodeType: 'OR' }
+'widget.0:45': { inputAddressSet: [ 'widget.0:44' ], nodeType: 'OR' /*chip*/ }
+'widget.0:49': { inputAddressSet: [ 'widget.0:48' ], nodeType: 'OR' /*OutputIO*/ }
+'widget.0:50': { inputAddressSet: [ 'board.0:26' ],  nodeType: 'OR' /*InputIO*/ }
+'widget.0:51': { inputAddressSet: [ 'widget.0:50' ], nodeType: 'OR' }
+'widget.0:55': { inputAddressSet: [ 'widget.0:54' ], nodeType: 'OR' /*chip*/ }
+'widget.0:56': { inputAddressSet: [ 'NAND.2:9' ],    nodeType: 'OR' /*chip*/ }
+'widget.0:57': { inputAddressSet: [ 'widget.0:56' ], nodeType: 'OR' }
+
+'widget.1:10': { inputAddressSet: [ 'board.0:21' ],  nodeType: 'OR' /*InputIO*/ }
+'widget.1:11': { inputAddressSet: [ 'widget.1:10' ], nodeType: 'OR' }
+'widget.1:15': { inputAddressSet: [ 'widget.1:14' ], nodeType: 'OR' /*chip*/ }
+'widget.1:19': { inputAddressSet: [ 'widget.1:18' ], nodeType: 'OR' /*OutputIO*/ }
+'widget.1:25': { inputAddressSet: [ 'widget.1:24' ], nodeType: 'OR' /*chip*/ }
+'widget.1:26': { inputAddressSet: [ 'NAND.3:9' ],    nodeType: 'OR' /*chip*/ }
+'widget.1:27': { inputAddressSet: [ 'widget.1:26' ], nodeType: 'OR' }
+'widget.1:30': { inputAddressSet: [ 'board.0:31' ],  nodeType: 'OR' /*InputIO*/ }
+'widget.1:31': { inputAddressSet: [ 'widget.1:30' ], nodeType: 'OR' }
+'widget.1:45': { inputAddressSet: [ 'widget.1:44' ], nodeType: 'OR' /*chip*/ }
+'widget.1:49': { inputAddressSet: [ 'widget.1:48' ], nodeType: 'OR' /*OutputIO*/ }
+'widget.1:50': { inputAddressSet: [ 'board.0:41' ],  nodeType: 'OR' /*InputIO*/ }
+'widget.1:51': { inputAddressSet: [ 'widget.1:50' ], nodeType: 'OR' }
+'widget.1:55': { inputAddressSet: [ 'widget.1:54' ], nodeType: 'OR' /*chip*/ }
+'widget.1:56': { inputAddressSet: [ 'NAND.4:9' ],    nodeType: 'OR' /*chip*/ }
+'widget.1:57': { inputAddressSet: [ 'widget.1:56' ], nodeType: 'OR' }
+
+'NAND.0:0':    { inputAddressSet: [ 'board.0:46' ],  nodeType: 'OR' /*InputIO*/ }
+'NAND.0:1':    { inputAddressSet: [ 'NAND.0:0' ],    nodeType: 'OR' }
+'NAND.0:5':    { inputAddressSet: [ 'board.0:56' ],  nodeType: 'OR' /*InputIO*/ }
+'NAND.0:6':    { inputAddressSet: [ 'NAND.0:5' ],    nodeType: 'OR' }
+'NAND.0:9':    { inputAddressSet: [ 'NAND.0:8' ],    nodeType: 'OR' /*OutputIO*/ }
+
+'NAND.1:0':    { inputAddressSet: [ 'widget.0:15' ], nodeType: 'OR' /*InputIO*/ }
+'NAND.1:1':    { inputAddressSet: [ 'NAND.1:0' ],    nodeType: 'OR' }
+'NAND.1:5':    { inputAddressSet: [ 'widget.0:25' ], nodeType: 'OR' /*InputIO*/ }
+'NAND.1:6':    { inputAddressSet: [ 'NAND.1:5' ],    nodeType: 'OR' }
+'NAND.1:9':    { inputAddressSet: [ 'NAND.1:8' ],    nodeType: 'OR' /*OutputIO*/ }
+
+'NAND.2:0':    { inputAddressSet: [ 'widget.0:45' ], nodeType: 'OR' /*InputIO*/ }
+'NAND.2:1':    { inputAddressSet: [ 'NAND.2:0' ],    nodeType: 'OR' }
+'NAND.2:5':    { inputAddressSet: [ 'widget.0:55' ], nodeType: 'OR' /*InputIO*/ }
+'NAND.2:6':    { inputAddressSet: [ 'NAND.2:5' ],    nodeType: 'OR' }
+'NAND.2:9':    { inputAddressSet: [ 'NAND.2:8' ],    nodeType: 'OR' /*OutputIO*/ }
+
+'NAND.3:0':    { inputAddressSet: [ 'widget.1:15' ], nodeType: 'OR' /*InputIO*/ }
+'NAND.3:1':    { inputAddressSet: [ 'NAND.3:0' ],    nodeType: 'OR' }
+'NAND.3:5':    { inputAddressSet: [ 'widget.1:25' ], nodeType: 'OR' /*InputIO*/ }
+'NAND.3:6':    { inputAddressSet: [ 'NAND.3:5' ],    nodeType: 'OR' }
+'NAND.3:9':    { inputAddressSet: [ 'NAND.3:8' ],    nodeType: 'OR' /*OutputIO*/ }
+
+'NAND.4:0':    { inputAddressSet: [ 'widget.1:45' ], nodeType: 'OR' /*InputIO*/ }
+'NAND.4:1':    { inputAddressSet: [ 'NAND.4:0' ],    nodeType: 'OR' }
+'NAND.4:5':    { inputAddressSet: [ 'widget.1:55' ], nodeType: 'OR' /*InputIO*/ }
+'NAND.4:6':    { inputAddressSet: [ 'NAND.4:5' ],    nodeType: 'OR' }
+'NAND.4:9':    { inputAddressSet: [ 'NAND.4:8' ],    nodeType: 'OR' /*OutputIO*/ }

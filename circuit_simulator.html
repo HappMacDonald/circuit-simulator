@@ -41,6 +41,66 @@ body
 </style>
 <script>
 
+/*
+== 2024-01-10T05:25-08:00 Todo status:
+Hooray! Circuit simulator is now simulating circuits again :D
+Push button and toggle not yet implemented.
+Honestly I might require some root instance outside designs after all to handle
+that, like a control panel full of user-accessible widgets to play with. 🤔
+
+== 2024-01-09T10:29-08:00 Todo status:
+Alright, my ruminations on how to disentangle "board" and "network" have evolved
+into the following set of challenges.
+1. I think I need to migrate "board" into "designs", a dictionary keyed by design names.
+   For the time being that would be just "main.inside" keyed to the current
+   board data structure, more or less.
+2. I need to work out an "instantiation process".
+3. `designs` would keep the cells array largely as-is, and edits in the UI would
+   be stored here instead of in `network`
+4. `network` would need to use addresses with *instance-name* based addresses
+   instead of design-name based ones. I'll need to flesh out fully what that means,
+   but for the time being I am penciling in the idea that an instance has a
+   name that is its design name with a period and an integer suffixed to the end.
+5. The network object would need to be cleared and then populated through an
+   "instancing process", probably every time between an edit and a simulation.
+   This might throw the "pause/edit/play" pattern out with the bathwater, but
+   the jury is still out about how doomed that pattern is.
+6. I also need to work out a concept of an "inside" vs "outside" design, for
+   designs that get used in other designs like chips and such. Because the
+   IO needs to have terminals that the calling design can connect to.
+7. There needs to be a root-level concept, and designs at the root level should
+   not have an "outside design" (or maybe I can allow them to but it would very
+   much go to waste in that instance)
+8. Then I'll probably hard-code which designs get instantiated at the root level
+9. And I'll need to figure out what and how designs need to get referenced from
+   one another, and how that gets represented in the instantiation process,
+   as a precondition to how I'm going to set up the `network` object and what
+   it's addressing is actually going to look like.
+10. On the `design[$name].cells` front however, it means we will still have a
+   `inputAddressSet` key but it can use local (id) addressing there.
+
+
+// == 2024-01-09T04:43-08:00 Todo status:
+// I'm trying to res up function `CalculateSignalMap` which takes as one input `network`
+// OG perl script keeps its "board2D" and "network" separate, but so far here I've
+// got them munged together a bit.
+// One justification being that OG Perl script uses "board2D" as it's primary
+// hard-coded board input and node placement design, whereas this javascript
+// version uses user input over time. Perl script translates hardcoded intput into
+// "network" with a different format, JS version translates UI input directly into
+// that same "network" format but puts it into the `board` structure instead.
+// Primary differences between Perl:"network" and JS:`board` thus far are:
+// * JS:`board` includes width, height, and name much like Perl:"board" does
+// * JS:`board` "network"-like stucture exists within key `cells`
+// * JS:`board.cells` is indexed by integer cellIndex, while Perl:"network" is
+//     indexed by "$name:$cellIndex". This allows "network" to describe connections
+//     across all possible boards simultaneously, and is also vital to
+//     the CalculateSignalMap() function I'm trying to build.
+
+// So I've got to disentangle the `cells` key out of `board` and change
+// its addressing.
+
+
 // == 2024-01-05 Todo status:
 // X Single grid board "main" hardcoded to exist at 10x10
 // X Legend of node types can be drug onto board
@@ -63,6 +123,7 @@ body
 //     (ev) =>
 //       { // so what can ev do?
 //       }
+*/
 
 ; // null means mouse recognized as being held down
 ; // this can also mean "drag interrupted so we're rejecting mouse until it's down again"
@@ -122,18 +183,22 @@ body
     }
   , A:
     { symbol: 'A'
+    , signalTrain: true
     , inputsAllowed: false
     }
   , B:
     { symbol: 'B'
+    , signalTrain: true
     , inputsAllowed: false
     }
   , C:
     { symbol: 'C'
+    , signalTrain: true
     , inputsAllowed: false
     }
   , D:
     { symbol: 'D'
+    , signalTrain: true
     , inputsAllowed: false
     }
   }
@@ -148,21 +213,25 @@ body
   ]
 
 ; window.SIMULATION_HAS_NOT_YET_HAPPENED = -1
-; window.steps = SIMULATION_HAS_NOT_YET_HAPPENED
+; window.step = SIMULATION_HAS_NOT_YET_HAPPENED
 ; window.stepDelayInMilliseconds = 500
 ; window.stepTimerHandle = null
 ; window.SAFE_TO_SKIP_HASH_CHECK = -1
-; window.lastSimulatedBoardHash = SAFE_TO_SKIP_HASH_CHECK
+; window.lastSimulatedDesignHash = SAFE_TO_SKIP_HASH_CHECK
 
-; window.board =
-  { width: 10
-  , height: 10
-  , name: "main"
-  , cells:[]
-  , DOMnode:null // will get filled in later
+; window.network = {}
+; window.designs =
+  { 'main.inside':
+    { width: 10
+    , height: 10
+    , name: "main.inside"
+    , cells:[]
+    , DOMnode:null // will get filled in later
+    }
   }
 
-; window.EMPTY_SIGNAL_MAP = new Set(['main:5', 'main:6', 'main:44'])
+// ; window.EMPTY_SIGNAL_MAP = new Set(['main.0:5', 'main.0:6', 'main.0:44'])
+; window.EMPTY_SIGNAL_MAP = new Set()
 ; window.signalMap = EMPTY_SIGNAL_MAP
 
 ; function Round(value) { return(Math.floor(value+0.5)) }
@@ -188,13 +257,13 @@ body
         }
       , nodeChildren:[]
       }
-  ; for(let y=0; y<board.height; y++)
+  ; for(let y=0; y<designs['main.inside'].height; y++)
     { let tableRow =
         { nodeName:"tr"
         , nodeChildren:[]
         }
-    ; for(let x=0; x<board.width; x++)
-      { let tableCellID = ("main:"+ (x+y*board.width))
+    ; for(let x=0; x<designs['main.inside'].width; x++)
+      { let tableCellID = ("main.inside:"+ (x+y*designs['main.inside'].width))
       ; let tableCell =
           { nodeName:"th"
           , nodeAttributes:
@@ -223,17 +292,17 @@ body
       }
     ; table.nodeChildren.push(tableRow)
     }
-  ; board.DOMnode = table
+  ; designs['main.inside'].DOMnode = table
   ; document.body.appendChild(createDomNode(table))
-  ; for(let cellIndex=0; cellIndex<board.width*board.height; cellIndex++)
-    { board.cells[cellIndex] ??=
-      { 'nodeType':'OR'
-      // { 'nodeType':nodeTypes[IntMod(cellIndex, nodeTypes.length)]
-      , 'inputMask':0
-      , 'neighborInputAddressSet':new Set()
+  ; for(let cellIndex=0; cellIndex<designs['main.inside'].width*designs['main.inside'].height; cellIndex++)
+    { designs['main.inside'].cells[cellIndex] ??=
+      { nodeType:'OR'
+      // { nodeType:nodeTypes[IntMod(cellIndex, nodeTypes.length)]
+      , inputMask:0
+      , inputAddressSet:new Set()
       }
 
-    ; RenderBoardCell(board, signalMap, cellIndex)
+    ; RenderBoardCell(designs['main.inside'], signalMap, cellIndex)
     }
   ; table =
     { nodeName:"table"
@@ -295,9 +364,9 @@ body
               ]
             }
           , { nodeName: 'td'
-            , nodeAttributes: {id:'stepsDisplayTD'}
+            , nodeAttributes: {id:'stepDisplayTD'}
             , nodeChildren:
-              [ 'Steps: '
+              [ 'step: '
               , SIMULATION_HAS_NOT_YET_HAPPENED
               ]
             }
@@ -409,7 +478,7 @@ body
   ; switch(droppedContents[0])
     { case 'nodeType':
       ; let nodeType = droppedContents[1]
-      ; board.cells[cellIndex].nodeType = nodeType
+      ; designs['main.inside'].cells[cellIndex].nodeType = nodeType
       ; break
 
       default:
@@ -422,7 +491,7 @@ body
         )
       ; break
     }
-  ; RenderBoardCell(board, signalMap, cellIndex)
+  ; RenderBoardCell(designs['main.inside'], signalMap, cellIndex)
   }
 
 // Accepts a node recipe of one of the following two forms:
@@ -495,34 +564,34 @@ body
         ) { break; } // only track dragging movement between distinct cells
 
       ; let SetInputFromNeighbor = (bitmask) =>
-        { let nodeType = board.cells[currentTableCellIndex].nodeType
+        { let nodeType = designs['main.inside'].cells[currentTableCellIndex].nodeType
         ; if(nodeTypeLegend[nodeType].inputsAllowed)
-          { board.cells[currentTableCellIndex].neighborInputAddressSet.add(mouseDownOver)
-          ; board.cells[currentTableCellIndex].inputMask |= bitmask
-          ; board.cells[oldTableCellIndex].neighborInputAddressSet.delete(tableCellID)
-          ; board.cells[oldTableCellIndex].inputMask &= ~maskOppositeDirections[bitmask]
-          ; RenderBoardCell(board, signalMap, oldTableCellIndex)
-          ; RenderBoardCell(board, signalMap, currentTableCellIndex)
+          { designs['main.inside'].cells[currentTableCellIndex].inputAddressSet.add(mouseDownOver)
+          ; designs['main.inside'].cells[currentTableCellIndex].inputMask |= bitmask
+          ; designs['main.inside'].cells[oldTableCellIndex].inputAddressSet.delete(tableCellID)
+          ; designs['main.inside'].cells[oldTableCellIndex].inputMask &= ~maskOppositeDirections[bitmask]
+          ; RenderBoardCell(designs['main.inside'], signalMap, oldTableCellIndex)
+          ; RenderBoardCell(designs['main.inside'], signalMap, currentTableCellIndex)
           }
         ; mouseDownOver=tableCellID
         }
-      ; if(oldTableCellIndex + board.width == currentTableCellIndex)
+      ; if(oldTableCellIndex + designs['main.inside'].width == currentTableCellIndex)
         { SetInputFromNeighbor(MASK_INPUT_FROM_ABOVE)
         }
         else if
           ( oldTableCellIndex - 1 == currentTableCellIndex
           // current cell not already on right edge
-          &&currentTableCellIndex%board.width<board.width-1
+          &&currentTableCellIndex%designs['main.inside'].width<designs['main.inside'].width-1
           )
         { SetInputFromNeighbor(MASK_INPUT_FROM_RIGHT)
         }
-        else if(oldTableCellIndex - board.width == currentTableCellIndex)
+        else if(oldTableCellIndex - designs['main.inside'].width == currentTableCellIndex)
         { SetInputFromNeighbor(MASK_INPUT_FROM_BELOW)
         }
         else if
           ( oldTableCellIndex + 1 == currentTableCellIndex
           // current cell not already on left edge
-          &&currentTableCellIndex%board.width>0
+          &&currentTableCellIndex%designs['main.inside'].width>0
           )
         { SetInputFromNeighbor(MASK_INPUT_FROM_LEFT)
         }
@@ -558,7 +627,11 @@ body
   { let cellAddress = board.name +':'+ cellIndex
   ; let node = document.getElementById(cellAddress)
   ; let cell = board.cells[cellIndex]
-  ; let hot = signalMap.has(board.name +':'+ cellIndex)
+
+  // Hardcoding name because "UI shows designs" vs
+  // "UI shows signaling instances" is presently an unsolved problem
+  // ; let hot = signalMap.has(board.name +':'+ cellIndex)
+  ; let hot = signalMap.has('main.0:'+ cellIndex)
   ; let symbol =
       ( cell.nodeType == 'OR'
       ? ''
@@ -603,8 +676,8 @@ body
   { if(typeof(address)!="string") { return -1; }
   ; let addressParts = address.split(':',2)
 
-  ; // only handle "main" board for the time being
-  ; if(addressParts[0]!='main') { return -1; }
+  ; // only handle "main.inside" board design for the time being
+  ; if(addressParts[0]!='main.inside') { return -1; }
 
   ; // invalid unless second part is a plainclothes non-negative integer
   ; if(!/^\d+$/.test(addressParts[1])) { return -1; }
@@ -612,79 +685,182 @@ body
   ; return(+addressParts[1])
   }
 
-function MediaPlayPause()
-{ clearInterval(stepTimerHandle)
-; userInterfaceMode = 1-userInterfaceMode // toggles between 0=edit and 1=simulate
-; document.getElementById('mediaControlPlayPause').firstChild.data =
-    mediaControlPlayPauseSymbols[userInterfaceMode]
+; function MediaPlayPause()
+  { clearInterval(stepTimerHandle)
+  ; userInterfaceMode = 1-userInterfaceMode // toggles between 0=edit and 1=simulate
+  ; document.getElementById('mediaControlPlayPause').firstChild.data =
+      mediaControlPlayPauseSymbols[userInterfaceMode]
 
-  if(userInterfaceMode==USER_INTERFACE_MODE_SIMULATE)
-  { // run first step immediately, and let that function handle scheduling
-    // later steps
-  ; SimulateStep()
-  }
-  else
-  { if(steps!=SIMULATION_HAS_NOT_YET_HAPPENED)
-    { lastSimulatedBoardHash = cyrb53(JSON.stringify(board))
+    if(userInterfaceMode==USER_INTERFACE_MODE_SIMULATE)
+    { // run first step immediately, and let that function handle scheduling
+      // later step
+    ; SimulateStep()
+    }
+    else
+    { if(step!=SIMULATION_HAS_NOT_YET_HAPPENED)
+      { lastSimulatedDesignHash = cyrb53(JSON.stringify(designs))
+      }
     }
   }
-}
 
-function SimulateStep()
-{ if(userInterfaceMode!=USER_INTERFACE_MODE_SIMULATE)
-  { clearInterval(stepTimerHandle)
+; function SimulateStep()
+  { if(userInterfaceMode!=USER_INTERFACE_MODE_SIMULATE)
+    { clearInterval(stepTimerHandle)
+    }
+
+  ; if(step == SIMULATION_HAS_NOT_YET_HAPPENED)
+    { signalMap = EMPTY_SIGNAL_MAP
+    ; lastSimulatedDesignHash = SAFE_TO_SKIP_HASH_CHECK
+    ; network = {}
+    ; InstantiateDesign('main.inside', 'main.0')
+    }
+
+  ; if
+    ( lastSimulatedDesignHash == SAFE_TO_SKIP_HASH_CHECK
+    ||lastSimulatedDesignHash == cyrb53(JSON.stringify(designs)) // no edits since last sim step
+    )
+    { step++
+    }
+    else
+    { network = {}
+    ; InstantiateDesign('main.inside', 'main.0')
+    }
+  ; UpdateStepDisplay()
+  ; lastSimulatedDesignHash = SAFE_TO_SKIP_HASH_CHECK
+
+  ; signalMap = CalculateSignalMap(signalMap, step)
+  ; RenderBoard(designs['main.inside'], signalMap)
+
+    // This `if` clause helps ensure that manual press of step forward in edit mode
+    // does not wind up repeating
+  ; if(userInterfaceMode==USER_INTERFACE_MODE_SIMULATE)
+    { clearInterval(stepTimerHandle)
+    ; stepTimerHandle = setInterval(SimulateStep, stepDelayInMilliseconds)
+    }
   }
 
-; if(steps == SIMULATION_HAS_NOT_YET_HAPPENED)
-  { signalMap = EMPTY_SIGNAL_MAP
-  ; lastSimulatedBoardHash = SAFE_TO_SKIP_HASH_CHECK
+; function CalculateSignalMap(oldSignalMap, step)
+  { let newSignalMap = new Set()
+  ; for(const selfAddress in network)
+    { let nodeType = network[selfAddress].nodeType
+
+    // Short circuit this node type to "hot" and move on
+    ; if(nodeType == 'STAR') { newSignalMap.add(selfAddress); continue; }
+
+    ; let inputAddressSet = network[selfAddress].inputAddressSet
+    ; let sumOfInputs = 0
+    ; for(const inputAddress of inputAddressSet.values())
+      { if(oldSignalMap.has(inputAddress)) { sumOfInputs++; }
+      }
+
+    ; // WIRE/OR nodes gain heat from any inputs
+    ; if(nodeType=='OR')
+      { if(sumOfInputs>0) { newSignalMap.add(selfAddress); }
+        else { newSignalMap.delete(selfAddress); }
+      ; continue
+      }
+
+    ; // NOT/NOR nodes gain heat from all-cold inputs
+    ; if(nodeType=='NOR')
+      { if(sumOfInputs<1) { newSignalMap.add(selfAddress); }
+        else { newSignalMap.delete(selfAddress); }
+      ; continue
+      }
+
+    ; // NAND nodes gain heat from having no more than 1 hot input
+    ; if(nodeType=='NAND')
+      { if(sumOfInputs<2) { newSignalMap.add(selfAddress); }
+        else { newSignalMap.delete(selfAddress); }
+      ; continue
+      }
+
+    ; // XOR nodes gain heat from having EXACTLY 1 hot input
+    ; if(nodeType=='XOR')
+      { if(sumOfInputs==1) { newSignalMap.add(selfAddress); }
+        else { newSignalMap.delete(selfAddress); }
+      ; continue
+      }
+
+    ; // AND nodes gain heat from having more than 1 hot input
+    ; if(nodeType=='AND')
+      { if(sumOfInputs>1) { newSignalMap.add(selfAddress); }
+        else { newSignalMap.delete(selfAddress); }
+      ; continue
+      }
+
+    ; // SignalTrain nodes only gain heat from their SignalTrain patterns
+    ; if(nodeTypeLegend[nodeType].signalTrain)
+      { const signalTrain = document.getElementById('legend-signalTextInput-'+ nodeType).value
+      ; if(signalTrain.substr(step%signalTrain.length, 1)=='1') { newSignalMap.add(selfAddress); }
+        else { newSignalMap.delete(selfAddress); }
+      ; continue
+      }
+
+    ; // Any nodeTypes we are not already handling just stay cold
+    ; newSignalMap.delete(selfAddress)
+    }
+  ; return(newSignalMap)
   }
 
-; if
-  ( lastSimulatedBoardHash == SAFE_TO_SKIP_HASH_CHECK
-  ||lastSimulatedBoardHash == cyrb53(JSON.stringify(board)) // no edits since last sim step
-  )
-  { steps++
+; function UpdateStepDisplay()
+  { document.getElementById('stepDisplayTD').childNodes[1].data = step
   }
-; UpdateStepsDisplay()
-; lastSimulatedBoardHash = SAFE_TO_SKIP_HASH_CHECK
 
-// TBI: Actually perform a simulation step
-; RenderBoard(board, signalMap)
-
-  // This `if` clause helps ensure that manual press of step forward in edit mode
-  // does not wind up repeating
-; if(userInterfaceMode==USER_INTERFACE_MODE_SIMULATE)
-  { clearInterval(stepTimerHandle)
-  ; stepTimerHandle = setInterval(SimulateStep, stepDelayInMilliseconds)
+; function InstantiateDesign(designName, instanceName)
+  { let board = designs[designName]
+  ; let boardCellCount = board.width*board.height
+  ; for(let cellIndex=0; cellIndex<boardCellCount; cellIndex++)
+    { let neighborInputAddresses = new Set()
+    ; let cell = board.cells[cellIndex]
+    ; if
+      ( cell.inputMask & MASK_INPUT_FROM_ABOVE
+      &&cellIndex>board.width
+      )
+      { neighborInputAddresses.add(instanceName +':'+ (cellIndex - board.width))
+      }
+    ; if
+      ( cell.inputMask & MASK_INPUT_FROM_RIGHT
+      &&( cellIndex%board.width < board.width-1 )
+      )
+      { neighborInputAddresses.add(instanceName +':'+ (cellIndex + 1))
+      }
+    ; if
+      ( cell.inputMask & MASK_INPUT_FROM_BELOW
+      &&(boardCellCount-cellIndex)>board.width
+      )
+      { neighborInputAddresses.add(instanceName +':'+ (cellIndex + board.width))
+      }
+    ; if
+      ( cell.inputMask & MASK_INPUT_FROM_LEFT
+      &&( cellIndex%board.width > 0 )
+      )
+      { neighborInputAddresses.add(instanceName +':'+ (cellIndex - 1))
+      }
+    ; if(cell.nodeType!='OR' || neighborInputAddresses.size>0)
+      { network[instanceName +':'+ cellIndex] =
+        { nodeType: cell.nodeType
+        , inputAddressSet: neighborInputAddresses
+        }
+      }
+    }
   }
-}
-
-function CalculateSignalMap(network, oldSignalMap, step)
-{ let newSignalMap = new Set()
-; return(newSignalMap)
-}
-
-function UpdateStepsDisplay()
-{ document.getElementById('stepsDisplayTD').childNodes[1].data = steps
-}
 
 // simple and fast 53-bit string hashing function released CC0 here:
 // https://github.com/bryc/code/blob/master/jshash/experimental/cyrb53.js
-function cyrb53(stringToHash, seed=0)
-{ let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed
-; for(let i = 0, ch; i < stringToHash.length; i++)
-  { ch = stringToHash.charCodeAt(i)
-  ; h1 = Math.imul(h1 ^ ch, 2654435761)
-  ; h2 = Math.imul(h2 ^ ch, 1597334677)
-  }
-; h1  = Math.imul(h1 ^ (h1 >>> 16), 2246822507)
-; h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909)
-; h2  = Math.imul(h2 ^ (h2 >>> 16), 2246822507)
-; h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+; function cyrb53(stringToHash, seed=0)
+  { let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed
+  ; for(let i = 0, ch; i < stringToHash.length; i++)
+    { ch = stringToHash.charCodeAt(i)
+    ; h1 = Math.imul(h1 ^ ch, 2654435761)
+    ; h2 = Math.imul(h2 ^ ch, 1597334677)
+    }
+  ; h1  = Math.imul(h1 ^ (h1 >>> 16), 2246822507)
+  ; h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  ; h2  = Math.imul(h2 ^ (h2 >>> 16), 2246822507)
+  ; h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909)
 
-; return 4294967296 * (2097151 & h2) + (h1 >>> 0)
-}
+  ; return 4294967296 * (2097151 & h2) + (h1 >>> 0)
+  }
 
 </script>
 </head>

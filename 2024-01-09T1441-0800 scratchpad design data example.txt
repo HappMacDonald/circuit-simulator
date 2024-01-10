@@ -1,0 +1,32 @@
+📌📍🔺🔻🕀🕭✔❌
+
+= DESIGN
+== board inside
+.....>Ao>.
+.....>B#..
+>Ao>.>CO>.
+>B#.......
+>CO>.>A#..
+.....>BO>.
+..........
+
+
+== widget inside
+..........
+A>..>A#.>o
+....>BO>..
+B>........
+....>A#.>O
+C>..>BO>..
+..........
+== widget outside
+Ao
+B#
+CO
+
+== NAND inside
+A>...
+B>.>O
+== NAND outside
+A#
+BO
