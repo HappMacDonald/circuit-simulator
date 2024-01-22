@@ -10,8 +10,8 @@ html
 body
 { display: grid;
   /*; background: white; */
-; grid-template-areas:  "header mediaControls"
-                        "boardDesigner legend"
+; grid-template-areas:  "header header mediaControls"
+                        "boardDesigner productUI legend"
 /* ; grid-template-rows:    100px 1fr
 ; grid-template-columns: 1fr 1fr */
 ; place-items: center
@@ -32,10 +32,23 @@ body
 .legend
 { grid-area: legend
 }
+.productUI
+{ grid-area: productUI
+; width: 100px
+; height: 151px
+}
 .cellSquare
 { width: 50px
 ; height: 50px
 ; text-align: center
+}
+.segmentCold
+{ stroke: black
+; fill: transparent
+}
+.segmentHot
+{ stroke: black
+; fill: black
 }
 
 </style>
@@ -114,11 +127,11 @@ into the following set of challenges.
 //   Possibly work out system for beyond-grid circuit design, especially for burnt chips.
 
 // DOM manip cheatsheet
-// ; document.createElement(nodeName)
+// ; document.createElementNS(nameSpace, nodeName)
 // ; document.body.appendChild(node)
 // ; document.createTextNode("text")
 // ; node.className = 'whatever';
-// ; node.setAttribute('draggable', 'true')
+// ; node.setAttributeNS(nameSpace, 'draggable', 'true')
 // ; node.onsomekindofeventhandler =
 //     (ev) =>
 //       { // so what can ev do?
@@ -218,6 +231,21 @@ into the following set of challenges.
 ; window.stepTimerHandle = null
 ; window.SAFE_TO_SKIP_HASH_CHECK = -1
 ; window.lastSimulatedDesignHash = SAFE_TO_SKIP_HASH_CHECK
+
+; window.sevenSegmentTemplate =
+  { width: 90
+  , height: 150
+  , cells:
+    [ [5, 0, 60, 10] // x, y, width, height
+    , [0, 10, 10, 60]
+    , [60, 10, 10, 60]
+    , [5, 70, 60, 10]
+    , [0, 80, 10, 60]
+    , [60, 80, 10, 60]
+    , [5, 140, 60, 10]
+    , [75, 140, 10, 10] // decimal point is eigth segment
+    ]
+  }
 
 ; window.network = {}
 ; window.designs =
@@ -322,7 +350,10 @@ into the following set of challenges.
               }
             , nodeChildren:
               [ { nodeName: 'button'
-                , nodeAttributes: { id:'mediaControlRestart' }
+                , nodeAttributes:
+                  { id:'mediaControlRestart'
+                  , onclick:'SimulationReset()'
+                  }
                 , nodeChildren: '⇤'
                 }
               ]
@@ -464,6 +495,44 @@ into the following set of challenges.
     ; table.nodeChildren.push(tableRow)
     }
   ; document.body.appendChild(createDomNode(table))
+  ; let productUI =
+      { nodeName: "svg"
+      , nameSpace: "http://www.w3.org/2000/svg"
+      , nodeAttributes:
+        { viewbox:
+          ( '0 0 '
+          + sevenSegmentTemplate.width
+          + ' '
+          + sevenSegmentTemplate.height
+          )
+        // , width: sevenSegmentTemplate.width +'mm'
+        // , height: sevenSegmentTemplate.height +'mm'
+        , preserveAspectRatio: 'xMaxYMax'
+        , class:'productUI'
+        , id:'productUI'
+        // , xmlns: "http://www.w3.org/2000/svg"
+      //   , style:
+      //     {
+      //     }
+        }
+      , nodeChildren:[]
+      }
+  ; for(let rectIndex=0; rectIndex<sevenSegmentTemplate.cells.length; rectIndex++)
+    { const rectData = sevenSegmentTemplate.cells[rectIndex]
+    ; const rectNodeDescription =
+        { nodeName:'rect'
+        , nodeAttributes:
+          { id: 'productUI.'+ rectIndex
+          , class: 'segmentCold'
+          , x: rectData[0]
+          , y: rectData[1]
+          , width: rectData[2]
+          , height: rectData[3]
+          }
+        }
+    ; productUI.nodeChildren.push(rectNodeDescription)
+    }
+  ; document.body.appendChild(createDomNode(productUI))
   }
 
 ; function nodeTypeDragStart(event)
@@ -496,7 +565,7 @@ into the following set of challenges.
 
 // Accepts a node recipe of one of the following two forms:
 // * A naked string
-// * { nodeName, nodeAttributes, nodeChildren }
+// * { nodeName, nameSpace?, nodeAttributes, nodeChildren }
 // where each node child is either another node.
 // naked Strings render to text nodes.
 ; function createDomNode(nodeRecipe)
@@ -505,7 +574,13 @@ into the following set of challenges.
     { if(nodeRecipe.hasOwnProperty("nodeName"))
       { nodeRecipe.nodeAttributes ??= {}
       ; nodeRecipe.nodeChildren ??= []
-      ; node = document.createElement(nodeRecipe.nodeName)
+      ; nodeRecipe.nameSpace ??= null //'http://www.w3.org/1999/xhtml'
+      ; if(nodeRecipe.nameSpace==null)
+        { node = document.createElement(nodeRecipe.nodeName)
+        }
+        else
+        { node = document.createElementNS(nodeRecipe.nameSpace, nodeRecipe.nodeName)
+        }
       ; for(let nodeAttribute in nodeRecipe.nodeAttributes)
         { let nodeAttributeContent = nodeRecipe.nodeAttributes[nodeAttribute]
         ; if(nodeAttribute=="style" && typeof(nodeAttributeContent)=="object")
@@ -518,14 +593,26 @@ into the following set of challenges.
                 + "; "
                 )
             }
-            node.setAttribute("style", styleString)
+          ; if(nodeRecipe.nameSpace==null)
+            { node.setAttribute("style", styleString)
+            }
+            else
+            { node.setAttributeNS(null, "style", styleString)
+            }
           }
           else
-          { node.setAttribute(nodeAttribute, nodeAttributeContent)
+          { if(nodeRecipe.nameSpace==null)
+            { node.setAttribute(nodeAttribute, nodeAttributeContent)
+            }
+            else
+            { node.setAttributeNS(null, nodeAttribute, nodeAttributeContent)
+            }
           }
         }
       ; for(let nodeChild in nodeRecipe.nodeChildren)
-        { node.appendChild(createDomNode(nodeRecipe.nodeChildren[nodeChild]))
+        { let childRecipe = nodeRecipe.nodeChildren[nodeChild]
+        ; childRecipe.nameSpace ??= nodeRecipe.nameSpace
+        ; node.appendChild(createDomNode(childRecipe))
         }
       }
       else
@@ -670,6 +757,24 @@ into the following set of challenges.
         backgroundStyles[backgroundStyleName].join(', ')
     }
   ; node.firstChild.data = symbol
+
+  ; if // TEMPORARY HACK seven segment display!
+    ( cellIndex%10==9
+    &&cellIndex<80
+    )
+    { const segment = Math.floor(cellIndex/10)
+    ; const rectNode = document.getElementById('productUI.'+ segment)
+    ; if(rectNode)
+      { if(hot)
+        { rectNode.classList.remove('segmentCold')
+        ; rectNode.classList.add('segmentHot')
+        }
+        else
+        { rectNode.classList.remove('segmentHot')
+        ; rectNode.classList.add('segmentCold')
+        }
+      }
+    }
   }
 
 ; function AddressToIndex(address)
@@ -703,15 +808,22 @@ into the following set of challenges.
     }
   }
 
+; function SimulationReset()
+  { signalMap = EMPTY_SIGNAL_MAP
+  ; lastSimulatedDesignHash = SAFE_TO_SKIP_HASH_CHECK
+  ; network = {}
+  ; step = SIMULATION_HAS_NOT_YET_HAPPENED
+  ; UpdateStepDisplay()
+  ; RenderBoard(designs['main.inside'], signalMap)
+  }
+
 ; function SimulateStep()
   { if(userInterfaceMode!=USER_INTERFACE_MODE_SIMULATE)
     { clearInterval(stepTimerHandle)
     }
 
   ; if(step == SIMULATION_HAS_NOT_YET_HAPPENED)
-    { signalMap = EMPTY_SIGNAL_MAP
-    ; lastSimulatedDesignHash = SAFE_TO_SKIP_HASH_CHECK
-    ; network = {}
+    { SimulationReset()
     ; InstantiateDesign('main.inside', 'main.0')
     }
 

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="90mm"
+   height="150mm"
+   viewBox="0 0 90 150"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.3.1 (91b66b0783, 2023-11-16)"
+   sodipodi:docname="7 segment.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="2.28034"
+     inkscape:cx="180.23628"
+     inkscape:cy="290.30758"
+     inkscape:window-width="3840"
+     inkscape:window-height="2068"
+     inkscape:window-x="-12"
+     inkscape:window-y="-12"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <rect
+       style="stroke-width:1"
+       id="A"
+       width="10"
+       height="60"
+       x="0"
+       y="-65"
+       transform="rotate(90)" />
+    <rect
+       style="stroke-width:1"
+       id="B"
+       width="10"
+       height="60"
+       x="0"
+       y="10" />
+    <rect
+       style="stroke-width:1"
+       id="C"
+       width="10"
+       height="60"
+       x="60"
+       y="10" />
+    <rect
+       style="stroke-width:1"
+       id="D"
+       width="10"
+       height="60"
+       x="70"
+       y="-65"
+       transform="rotate(90)" />
+    <rect
+       style="stroke-width:1"
+       id="E"
+       width="10"
+       height="60"
+       x="0"
+       y="80" />
+    <rect
+       style="stroke-width:1"
+       id="F"
+       width="10"
+       height="60"
+       x="60"
+       y="80" />
+    <rect
+       style="stroke-width:1"
+       id="G"
+       width="10"
+       height="60"
+       x="140"
+       y="-65"
+       transform="rotate(90)" />
+    <rect
+       style="stroke-width:1"
+       id="H"
+       width="10"
+       height="10"
+       x="140"
+       y="-85"
+       transform="rotate(90)" />
+  </g>
+</svg>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="90mm" height="150mm" viewBox="0 0 90 150" id="productUI" class="productUI" xmlns="http://www.w3.org/2000/svg">
+  <rect id="XXXX.A" width="60" height="10" x="5" y="0"></rect>
+  <rect id="XXXX.B" width="10" height="60" x="0" y="10"></rect>
+  <rect id="XXXX.C" width="10" height="60" x="60" y="10"></rect>
+  <rect id="XXXX.D" width="60" height="10" x="5" y="70"></rect>
+  <rect id="XXXX.E" width="10" height="60" x="0" y="80"></rect>
+  <rect id="XXXX.F" width="10" height="60" x="60" y="80"></rect>
+  <rect id="XXXX.G" width="60" height="10" x="5" y="140"></rect>
+  <rect id="XXXX.H" width="10" height="10" x="75" y="140"></rect>
+</svg>
